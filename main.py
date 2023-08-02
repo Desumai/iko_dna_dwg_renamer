@@ -1,24 +1,16 @@
-import environ
-import pdf_stuff
+
 from file_management import get_PDF_path, get_save_path
 from PyPDF2 import PdfReader,PdfWriter
-from pdf_stuff import save_temp_imgs,convert_pdf_to_image_list, pdf_to_np_array_list
+from pdf_stuff import pdf_to_np_array_list
 from OCR import opencv_find_dwg_num, opencv_find_dwg_title
-import os, shutil
+import os, consts
 from pytesseract import pytesseract
 
-env = environ.Env(
-    DEBUG = (bool,False)
-)
 
-#load config from .env file
-environ.Env.read_env()
 
-popplerPath = env("POPPLER_PATH")
-tesseractPath = env("TESSERACT_PATH")
-tempPath = env("TEMP_PATH")
 
-pytesseract.tesseract_cmd = tesseractPath
+#set tesseract path
+pytesseract.tesseract_cmd = consts.TESSERACT_PATH
 
 print("Select input PDF")
 #get input file path
@@ -79,9 +71,10 @@ with open(inputPath, "rb") as file:
             output.write(outputStream)
             continue
 """
+
 print("Deleting temp files...")
-for filename in os.listdir(tempPath):
-    file_path = os.path.join(tempPath, filename)
+for filename in os.listdir(consts.TEMP_PATH):
+    file_path = os.path.join(consts.TEMP_PATH, filename)
     try:
         if os.path.isfile(file_path) or os.path.islink(file_path):
             os.unlink(file_path)
@@ -91,3 +84,4 @@ for filename in os.listdir(tempPath):
         print('Failed to delete %s. Reason: %s' % (file_path, e))
 """
 print('done')
+input("Press ENTER to continue...")
