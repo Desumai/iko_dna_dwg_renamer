@@ -1,7 +1,6 @@
-import fitz, sys
+import fitz
 from fitz import Pixmap
 import numpy as np
-from PIL import Image
 from cv2 import imdecode
 
 # Print iterations progress. from https://stackoverflow.com/questions/3173320/text-progress-bar-in-terminal-with-block-characters
@@ -30,9 +29,7 @@ def printProgressBar(
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
     bar = fill * filledLength + "-" * (length - filledLength)
-    sys.stdout.write(f"\r{prefix} |{bar}| {percent}% {suffix}")
-    sys.stdout.write(printEnd)
-    sys.stdout.flush()
+    print(f"\r{prefix} |{bar}| {percent}% {suffix}", end=printEnd)
     # Print New Line on Complete
     if iteration == total:
         print()
@@ -43,12 +40,12 @@ def pdf_to_np_array_list(filePath:str):
         numOfPages = len(file)
         print(f"{numOfPages} drawings found.")
         print("Converting PDF to images...")
-        printProgressBar(0, numOfPages,prefix="Progress: ", suffix="({:<15}".format(f"{0}/{numOfPages})"))
+        printProgressBar(0, numOfPages,prefix="Progress: ", suffix="({:<15}".format(f"{0}/{numOfPages})"), length=50)
         for i, page in enumerate(file):
             pixmap:Pixmap = page.get_pixmap(dpi =300)
             npArr = imdecode(np.frombuffer(pixmap.tobytes(), dtype=np.uint8), -1)
             imgList.append(npArr)
-            printProgressBar(i + 1, numOfPages,prefix="Progress: ", suffix="({:<15}".format(f"{i + 1}/{numOfPages})"))
+            printProgressBar(i + 1, numOfPages,prefix="Progress: ", suffix="({:<15}".format(f"{i + 1}/{numOfPages})"), length=50)
     #printProgressBar(numOfPages, numOfPages,prefix="Progress: ", suffix="({:<15}".format(f"{numOfPages}/{numOfPages})"))
     print("\n")
     return imgList
