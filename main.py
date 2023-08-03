@@ -32,23 +32,22 @@ if not os.path.exists(successPath):
 if not os.path.exists(failPath):
     os.makedirs(failPath)
 
-print("Converting pdf to images...")
+print("Parsing input PDF...")
 pdfImages = pdf_to_np_array_list(inputPath)
 
-print(f"{len(pdfImages)} drawings found.")
 
 print("Reading drawings...")
 
 with open(inputPath, "rb") as file:
     inputPdf = PdfReader(file)
-
+    numOfImages = len(pdfImages)
     for i, image in enumerate(pdfImages):
         result = [None,None] #dwg num, dwg title
         try:
             find_dwg_num_and_title(image,result)
-            print(f"{i}: {result[0]}")
+            print("{:>4}".format(f"({i + 1}") +  f"/{numOfImages}): {result[0]}")
         except Exception as e:
-            print(f"{i}: {e}")
+            print("{:>4}".format(f"({i + 1}") +  f"/{numOfImages}): [ERROR] {e}")
         output = PdfWriter()
         output.add_page(inputPdf.pages[i])
         if(result[0] is not None and result[1] is not None):
@@ -57,14 +56,14 @@ with open(inputPath, "rb") as file:
                     output.write(outputStream)
                 continue
             except Exception as e:
-                print(f"{i}: [ERROR] {e}")
+                print("{:>4}".format(f"({i + 1}") +  f"/{numOfImages}): [ERROR] {e}")
         if (result[0] is not None):
             try:
                 with open(failPath + "\\" + result[0] + ".pdf", "wb") as outputStream:
                     output.write(outputStream)
                 continue
             except Exception as e:
-                print(f"{i}: [ERROR] {e}")
+                print("{:>4}".format(f"({i + 1}") +  f"/{numOfImages}): [ERROR] {e}")
         with open(failPath + "\\drawing" + "{:03d}".format(i) + ".pdf", "wb") as outputStream:
             output.write(outputStream)
         continue
