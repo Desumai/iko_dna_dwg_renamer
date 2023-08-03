@@ -2,7 +2,7 @@
 from file_management import get_PDF_path, get_save_path
 from PyPDF2 import PdfReader,PdfWriter
 from pdf_stuff import pdf_to_np_array_list
-from OCR import opencv_find_dwg_num, opencv_find_dwg_title
+from OCR import find_dwg_num_and_title
 import os, consts
 from pytesseract import pytesseract
 
@@ -43,26 +43,24 @@ with open(inputPath, "rb") as file:
     inputPdf = PdfReader(file)
 
     for i, image in enumerate(pdfImages):
-        dwgName = None
-        dwgTitle = None
+        result = [None,None] #dwg num, dwg title
         try:
-            dwgName = opencv_find_dwg_num(image)
-            dwgTitle = opencv_find_dwg_title(image)
-            print(f"{i}: {dwgName}")
+            find_dwg_num_and_title(image,result)
+            print(f"{i}: {result[0]}")
         except Exception as e:
             print(f"{i}: {e}")
         output = PdfWriter()
         output.add_page(inputPdf.pages[i])
-        if(dwgName is not None and dwgTitle is not None):
+        if(result[0] is not None and result[1] is not None):
             try:
-                with open(successPath + "\\" + dwgTitle + '-' + dwgName + ".pdf", "wb") as outputStream:
+                with open(successPath + "\\" + result[1] + '-' + result[0] + ".pdf", "wb") as outputStream:
                     output.write(outputStream)
                 continue
             except Exception as e:
                 print(f"{i}: [ERROR] {e}")
-        if (dwgName is not None):
+        if (result[0] is not None):
             try:
-                with open(failPath + "\\" + dwgName + ".pdf", "wb") as outputStream:
+                with open(failPath + "\\" + result[0] + ".pdf", "wb") as outputStream:
                     output.write(outputStream)
                 continue
             except Exception as e:
