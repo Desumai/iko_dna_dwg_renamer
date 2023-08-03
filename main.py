@@ -12,7 +12,7 @@ from pytesseract import pytesseract
 #set tesseract path
 pytesseract.tesseract_cmd = consts.TESSERACT_PATH
 
-print("Select input PDF")
+print("Select input PDF package")
 #get input file path
 inputPath = get_PDF_path()
 if(inputPath is None):
@@ -57,19 +57,19 @@ with open(inputPath, "rb") as file:
             try:
                 with open(successPath + "\\" + dwgTitle + '-' + dwgName + ".pdf", "wb") as outputStream:
                     output.write(outputStream)
-                    continue
+                continue
             except Exception as e:
                 print(f"{i}: [ERROR] {e}")
         if (dwgName is not None):
             try:
                 with open(failPath + "\\" + dwgName + ".pdf", "wb") as outputStream:
                     output.write(outputStream)
-                    continue
+                continue
             except Exception as e:
-                print(f"{i}: {e}")
+                print(f"{i}: [ERROR] {e}")
         with open(failPath + "\\drawing" + "{:03d}".format(i) + ".pdf", "wb") as outputStream:
             output.write(outputStream)
-            continue
+        continue
 """
 
 print("Deleting temp files...")

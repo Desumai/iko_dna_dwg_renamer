@@ -34,7 +34,7 @@ def reformat_dwg_title(dwgTitle:str, excludeChars:list = ["\n"], replaceChars:di
     return dwgTitle
 
 def opencv_find_dwg_num(
-    image: Image, MIN_AREA_RATIO: float = 0.0001783, MAX_AREA_RATIO: float = 0.3464, Y_TOLERANCE=50, MIN_BOX_HEIGHT:int = 50
+    image: Image, MIN_BOX_AREA: int = 3000, MAX_AREA_RATIO: float = 0.3464, Y_TOLERANCE=50, MIN_BOX_HEIGHT:int = 40
 ):
 
     # image data
@@ -66,7 +66,7 @@ def opencv_find_dwg_num(
         x, y, w, h = cv2.boundingRect(c)
         if(h < MIN_BOX_HEIGHT):
             continue
-        if imgArea * MIN_AREA_RATIO < w * h < imgArea * MAX_AREA_RATIO:
+        if MIN_BOX_AREA < w * h < imgArea * MAX_AREA_RATIO:
             filteredContours.append(c)
 
     lastRowY = -1
@@ -126,8 +126,13 @@ def opencv_find_dwg_num(
 
 def opencv_find_dwg_title(
     image: Image,
-    MAX_AREA: float = 0.3464,
-    xTol=20,
+    MIN_BOX_AREA:int = 3000,
+    MAX_BOX_AREA_RATIO: float = 0.3464,
+    X_TOLERANCE:int=20,
+    MIN_TEXT_AREA:int = 500,
+    MIN_TEXT_HEIGHT:int = 10,
+    MIN_TEXT_WIDTH:int = 10,
+    MIN_PERCENT_INDENT:float = 0.1
 ):
     imgHeight = image.shape[0]
     imgWidth = image.shape[1]
@@ -138,17 +143,17 @@ def opencv_find_dwg_title(
     # Convert the image to gray scale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
+    thresh = cv2.threshold(gray, 254, 255, cv2.THRESH_BINARY)[1]
     # invert image and apply threshold
-    threshInv = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[
+    threshInv = cv2.threshold(thresh, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[
         1
     ]
 
     # blur image then dialate
     blur = cv2.GaussianBlur(threshInv, (1, 1), 0)
-    dilalate = cv2.dilate(blur, np.ones((3, 3)))
 
     # re-invert the image
-    reInv = cv2.threshold(threshInv, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+    reInv = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
 
     # find all contours
     contours, heiarchy = cv2.findContours(reInv, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -161,7 +166,7 @@ def opencv_find_dwg_title(
         x, y, w, h = cv2.boundingRect(c)
         if h < 30:
             continue
-        if 3000 < w * h < imgArea * MAX_AREA:
+        if MIN_BOX_AREA < w * h < imgArea * MAX_BOX_AREA_RATIO:
             filteredContours.append(c)
 
     # get the x value of the right border edge of the drawing
@@ -176,7 +181,7 @@ def opencv_find_dwg_title(
     edgeContours = []
     for c in filteredContours:
         x, y, w, h = cv2.boundingRect(c)
-        if rightEdgeX - (x + w) <= xTol:
+        if rightEdgeX - (x + w) <= X_TOLERANCE:
             edgeContours.append(c)
 
     # find title box, third last box
@@ -199,7 +204,7 @@ def opencv_find_dwg_title(
     titleReInv = cv2.threshold(
         titleThreshInv, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
     )[1]
-
+    
     titleContours, _ = cv2.findContours(dialation, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
     boxContours = []
@@ -207,7 +212,7 @@ def opencv_find_dwg_title(
     for i in range(len(titleContours)):
         x, y, w, h = cv2.boundingRect(titleContours[i])
         A = w * h
-        if A < 500 or x < round(w * 0.1) or w < 10 or h < 10:
+        if A < MIN_TEXT_AREA or x < round(w * MIN_PERCENT_INDENT) or w < MIN_TEXT_WIDTH or h < MIN_TEXT_HEIGHT:
             otherBoxContours.append(
                 np.array([[x, y], [x + w, y], [x + w, y + h], [x, y + h]])
                 .reshape((-1, 1, 2))
@@ -223,7 +228,7 @@ def opencv_find_dwg_title(
     isTitleBox = False
     for c in otherBoxContours:
         x, y, w, h = cv2.boundingRect(c)
-        if w < 10 or h < 10:
+        if w < MIN_TEXT_WIDTH or h < MIN_TEXT_HEIGHT:
             continue
         textImg = titleImg[y : y + h, x : x + w]
         text = pytesseract.image_to_string(textImg, config="--psm 6")

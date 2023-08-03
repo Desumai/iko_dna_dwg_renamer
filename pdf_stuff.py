@@ -2,7 +2,7 @@ import pdf2image, fitz
 from fitz import Pixmap
 import numpy as np
 from PIL import Image
-import io
+from cv2 import imdecode
 
 def convert_pdf_to_image_list(filePath: str,popplerPath:str):
     return pdf2image.convert_from_path(
@@ -14,9 +14,7 @@ def pdf_to_np_array_list(filePath:str):
     with fitz.open(filePath) as file:
         for i, page in enumerate(file):
             pixmap:Pixmap = page.get_pixmap(dpi =300)
-            pilImage = Image.open(io.BytesIO(pixmap.tobytes()))
-            npArr = np.array(pilImage)
-            pilImage.close
+            npArr = imdecode(np.frombuffer(pixmap.tobytes(), dtype=np.uint8), -1)
             imgList.append(npArr)
     return imgList
 
