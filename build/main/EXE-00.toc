@@ -59,7 +59,7 @@
  [],
  False,
  False,
- 1690992266,
+ 1691087559,
  [('run.exe',
    'c:\\Users\\siudust\\Documents\\src\\dna_dwg_renamer\\.venv\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\run.exe',
    'EXECUTABLE')])
