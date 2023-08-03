@@ -1,4 +1,4 @@
-import fitz
+import fitz, sys
 from fitz import Pixmap
 import numpy as np
 from PIL import Image
@@ -30,7 +30,9 @@ def printProgressBar(
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
     bar = fill * filledLength + "-" * (length - filledLength)
-    print(f"\r{prefix} |{bar}| {percent}% {suffix}", end=printEnd)
+    sys.stdout.write(f"\r{prefix} |{bar}| {percent}% {suffix}")
+    sys.stdout.write(printEnd)
+    sys.stdout.flush()
     # Print New Line on Complete
     if iteration == total:
         print()
