@@ -4,50 +4,34 @@ import numpy as np
 import pytesseract
 from PIL import Image
 
-def reformat_dwg_num(dwgNum:str, excludeChars:list = [" ", "\n",".iam",".ipt","~"]):
+def reformat_dwg_num(dwgNum:str, excludeChars:list = [" ", "\n",".iam",".ipt","~"]) -> str:
     for chars in excludeChars:
         dwgNum = dwgNum.replace(chars, '')
+    if(dwgNum[len(dwgNum) - 1] == "."):
+        dwgNum = dwgNum[:len(dwgNum) - 1]
     return dwgNum
 
-def reformat_dwg_title(dwgTitle:str, excludeChars:list = ["\n"], replaceChars:dict = {" ":"_","@": '', '"': "in", "'": "ft", "&":"AND", "#":"NUM"}):
-    for chars in excludeChars:
-        dwgTitle = dwgTitle.replace(chars, '')
-    for chars in replaceChars.keys():
-        dwgTitle = dwgTitle.replace(chars, replaceChars[chars])
-    #handle "/" characters
-    while "/" in dwgTitle:
-        index = dwgTitle.index("/")
-        try:
-            #is fraction
-            if(dwgTitle[index - 1].isdigit() and dwgTitle[index + 1].isdigit()):
-                #get numerator:
-                numeratorIndex = index - 1
-                for i in reversed(range(0,index)):
-                    if(not dwgTitle[i].isdigit()):
-                        break
-                    numeratorIndex = i
-                #get denominator
-                denominatorIndex = index + 1
-                for i in range(index + 1, len(dwgTitle)):
-                    if(not dwgTitle[i].isdigit()):
-                        break
-                    denominatorIndex = i
-                numVal = round(int(dwgTitle[numeratorIndex:index])/int(dwgTitle[(index + 1):(denominatorIndex + 1)]),4)
-                dwgTitle = dwgTitle[:numeratorIndex] + str(numVal) + dwgTitle[denominatorIndex + 1:]
-            #is "W/" ("with" abreviaton)
-            elif(dwgTitle[index - 1].upper() == "W") and not dwgTitle[index - 2].isalnum():
-                dwgTitle = dwgTitle[:index - 1] + "WITH" + dwgTitle[index + 1:]
-            #is "C/W" ("comes with" abreviation)
-            elif (dwgTitle[index - 1:index + 2].upper() == "C/W") and not dwgTitle[index - 2].isalnum() and not dwgTitle[index + 2].isalnum():
-                dwgTitle = dwgTitle[:index - 1] + "WITH" + dwgTitle[index + 2:]
-            else: #replace "/" with "-" 
-                dwgTitle = dwgTitle[:index] + "-" + dwgTitle[index + 1:]
-        except Exception as e:
-            #replace "/" with "-" 
-            dwgTitle = dwgTitle[:index] + "-" + dwgTitle[index + 1:]
-    return dwgTitle
+def reformat_sheet_num(sheetNum:str) -> tuple:
+    sheetNum = sheetNum.upper().replace(" ","")
+    try:
+        if "OF" not in sheetNum:
+            raise Exception()
+        numList = sheetNum.split("OF")
+        first = int(numList[0])
+        second = int(numList[1])
+        if(first > second) or first < 1 or second < 1:
+            raise Exception()
+        return (first, second)
+    except Exception as e:
+        raise Exception(f"Wrong Sheet Number format: '{sheetNum}'")
 
-def find_dwg_num_box_contour(boxContours: list, Y_TOLERANCE: int = 45):
+        
+
+def find_sheet_num_and_dwg_num_box_contour(boxContours: list, Y_TOLERANCE: int = 45) -> tuple:
+    """
+    Finds the contours for the sheet number box and drawing number box for a drawing page
+    Returns tuple (sheet box contour, dwg num box contour)
+    """
     lastRowY = -1
     for c in boxContours:
         x, y, w, h = cv2.boundingRect(c)
@@ -66,54 +50,27 @@ def find_dwg_num_box_contour(boxContours: list, Y_TOLERANCE: int = 45):
         if lastRowY - Y_TOLERANCE <= y <= lastRowY:
             if secondLastX < x < lastX:
                 secondLastX = x
-    contour = None
+    sheetNumContour = None
+    dwgNumContour = None
     for c in boxContours:
         x, y, w, h = cv2.boundingRect(c)
-        if x == secondLastX and lastRowY - Y_TOLERANCE <= y <= lastRowY:
-            contour = c
-    return contour
+        if lastRowY - Y_TOLERANCE <= y <= lastRowY:
+            if x == lastX:
+                sheetNumContour = c
+            elif x == secondLastX:
+                dwgNumContour = c
+    return (sheetNumContour, dwgNumContour)
 
 
-def find_dwg_title_box_contour(boxContours: list, X_TOLERANCE: int = 20):
-    try:
-        # get the x value of the right border edge of the drawing
-        rightEdgeX = -1
-        for c in boxContours:
-            x, y, w, h = cv2.boundingRect(c)
-            rightEdge = x + w
-            if rightEdge > rightEdgeX:
-                rightEdgeX = rightEdge
-
-        # keep only right most boxes, remove others
-        edgeContours = []
-        for c in boxContours:
-            x, y, w, h = cv2.boundingRect(c)
-            if rightEdgeX - (x + w) <= X_TOLERANCE:
-                edgeContours.append(c)
-
-        # find title box, third last box
-        edgeContours.sort(
-            key=lambda c: cv2.boundingRect(c)[1], reverse=True
-        )  # sort by descending y values
-        return edgeContours[2]
-    except Exception as e:
-        return None
-
-
-def find_dwg_num_and_title(
+def find_dwg_and_sheet_num(
     image: np.ndarray,
     output: list = [None, None],  # [dwg num, dwg title]
     MIN_BOX_AREA: int = 3000,
     MIN_BOX_HEIGHT: int = 40,
     MAX_BOX_AREA_RATIO: float = 0.3464,
-    DRAWING_NUMBER_BOX_HEADER_VERTICAL_SPLIT: float = 0.4,
-    X_TOLERANCE: int = 20,
+    DATA_BOX_HEADER_VERTICAL_SPLIT: float = 0.4,
     Y_TOLERANCE=45,
-    MIN_TEXT_HEIGHT: int = 10,
-    MIN_TEXT_WIDTH: int = 10,
-    MIN_TEXT_AREA: int = 500,
-    MIN_PERCENT_INDENT: float = 0.1,
-):
+) -> None:
     """
     Finds the title and number of a drawing and stores the values in [output].
     [output] is a len(2) list of dwg #, dwg title. Values that could not be found
@@ -163,115 +120,54 @@ def find_dwg_num_and_title(
     dataBoxContours = []
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
-        if h < 30:
+        if h < MIN_BOX_HEIGHT:
             continue
         if MIN_BOX_AREA < w * h < imgArea * MAX_BOX_AREA_RATIO:
             dataBoxContours.append(c)
 
+    #find contours for sheet num and dwg num boxes
+    sheetNumBoxContour, dwgNumBoxContour = find_sheet_num_and_dwg_num_box_contour(dataBoxContours, Y_TOLERANCE)
+
     ###### find drawing number ######
 
-    # find contours for dwg num field
-    numBoxContours = find_dwg_num_box_contour(dataBoxContours, Y_TOLERANCE=Y_TOLERANCE)
-    if numBoxContours is None:  # null check
+    # make sure dwg num field is found
+    if dwgNumBoxContour is None:  # null check
         raise Exception("Drawing Number field not found")
 
-    dwgX, dwgY, dwgW, dwgH = cv2.boundingRect(numBoxContours)
+    dwgX, dwgY, dwgW, dwgH = cv2.boundingRect(dwgNumBoxContour)
     # check if correct field was found
     headerText = pytesseract.image_to_string(
         image=image[
-            dwgY : dwgY + round(DRAWING_NUMBER_BOX_HEADER_VERTICAL_SPLIT * dwgH),
+            dwgY : dwgY + round(DATA_BOX_HEADER_VERTICAL_SPLIT * dwgH),
             dwgX : dwgX + dwgW,
         ],
         config="--psm 6",
     )
     if "DRAWING#" not in headerText.upper():
-        raise Exception(f"Wrong field found. Not a drawing number ('{headerText}')")
+        raise Exception(f"Wrong field found. Not a drawing number ('{headerText}' field found instead)")
 
     # read and save drawing number
-    cropped = image[round(dwgY + DRAWING_NUMBER_BOX_HEADER_VERTICAL_SPLIT * dwgH) : dwgY + dwgH, dwgX : dwgX + dwgW]
+    cropped = image[round(dwgY + DATA_BOX_HEADER_VERTICAL_SPLIT * dwgH) : dwgY + dwgH, dwgX : dwgX + dwgW]
     text = pytesseract.image_to_string(cropped, config="--psm 6")
     output[0] = reformat_dwg_num(text)
 
-    ###### find drawing title ######
-
-    # find contours for dwg title field
-    titleBoxContours = find_dwg_title_box_contour(dataBoxContours,X_TOLERANCE=X_TOLERANCE)
-    if titleBoxContours is None:  # null check
-        raise Exception("Drawing Title field not found")
-
-    # crop dwg title field as its own image
-    titleX, titleY, titleW, titleH = cv2.boundingRect(titleBoxContours)
-    titleImg = image[titleY : titleY + titleH, titleX : titleX + titleW]
-
-    # find text contours in dwg title field
-
-    # Convert the image to gray scale
-    titleGray = cv2.cvtColor(titleImg, cv2.COLOR_BGR2GRAY)
-
-    # apply threshold
-    titleThreshInv = cv2.threshold(
-        titleGray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-    )[1]
-    rectKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 3))
-    dialation = cv2.dilate(titleThreshInv, rectKernel, iterations=1)
-
-    titleContoursList, _ = cv2.findContours(
-        dialation, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE
-    )
-
-    # find contours for title text inside dwg title box
-    titleTextContours = []
-    otherContours = []
-    for i in range(len(titleContoursList)):
-        x, y, w, h = cv2.boundingRect(titleContoursList[i])
-        A = w * h
-        if (
-            A < MIN_TEXT_AREA
-            or x < round(w * MIN_PERCENT_INDENT)
-            or w < MIN_TEXT_WIDTH
-            or h < MIN_TEXT_HEIGHT
-        ):
-            otherContours.append(
-                np.array([[x, y], [x + w, y], [x + w, y + h], [x, y + h]])
-                .reshape((-1, 1, 2))
-                .astype(np.int32)
-            )
-        else:
-            titleTextContours.append(
-                np.array([[x, y], [x + w, y], [x + w, y + h], [x, y + h]])
-                .reshape((-1, 1, 2))
-                .astype(np.int32)
-            )
-    if len(titleTextContours) < 1:
-        raise Exception("No drawing title found")
+    ###### find sheet number ######
     
-    #ensure field found is title box i.e. contains the text "TITLE"
-    isTitleBox = False
-    for c in otherContours:
-        x, y, w, h = cv2.boundingRect(c)
-        if w < 30 or h < 10 or w * h < 300:
-            continue
-        tempImg = titleImg[y : y + h , x : x + w]
-        text:str = pytesseract.image_to_string(tempImg, config="--psm 6")
-        if("TITLE" in text.upper()):
-            isTitleBox = True
-            break
-    if(not isTitleBox):
-        raise Exception("Wrong field found. Not a drawing title")
-    
-    # read and save title text
-    titleTextContours.sort(  # sort text by left to right, top down
-        key=lambda c: cv2.boundingRect(c)[1] * 1000000 + cv2.boundingRect(c)[0],
-        reverse=False,
+    #make sure sheet num field is found
+    if sheetNumBoxContour is None: #null check
+        raise Exception("Sheet Number field not found")
+    dwgX, dwgY, dwgW, dwgH = cv2.boundingRect(sheetNumBoxContour)
+    # check if correct field was found
+    headerText = pytesseract.image_to_string(
+        image=image[
+            dwgY : dwgY + round(DATA_BOX_HEADER_VERTICAL_SPLIT * dwgH),
+            dwgX : dwgX + dwgW,
+        ],
     )
-    titleComp = []
-    for c in titleTextContours:
-        x, y, w, h = cv2.boundingRect(c)
-        textImg = titleImg[y : y + h, x : x + w]
-        text = pytesseract.image_to_string(textImg, config="--psm 6")
-        if text == "" or text == "\n" or text == " ":
-            continue
-        titleComp.append(text)
-    if len(titleComp) < 1:
-        raise Exception("No drawing title found")
-    output[1] = reformat_dwg_title("-".join(titleComp))
+    if "SHEET" not in headerText.upper():
+        raise Exception(f"Wrong field found. Not sheet number information  ('{headerText}' field found instead)")
+
+    # read and save drawing number
+    cropped = image[round(dwgY + DATA_BOX_HEADER_VERTICAL_SPLIT * dwgH) : dwgY + dwgH, dwgX : dwgX + dwgW]
+    text = pytesseract.image_to_string(cropped, config="--psm 6")
+    output[1] = reformat_sheet_num(text)
