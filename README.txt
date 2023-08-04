@@ -1,6 +1,6 @@
 Creator: siudust
-Date: August 3, 2023
-Version 0.1.1
+Date: August 4, 2023
+Version 0.2.1
 
 
 Program Info:

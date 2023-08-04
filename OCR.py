@@ -9,28 +9,42 @@ def reformat_dwg_num(dwgNum:str, excludeChars:list = [" ", "\n",".iam",".ipt","~
         dwgNum = dwgNum.replace(chars, '')
     return dwgNum
 
-def reformat_dwg_title(dwgTitle:str, excludeChars:list = ["\n"], replaceChars:dict = {" ":"_","@": '', '"': "in", "'": "ft"}):
+def reformat_dwg_title(dwgTitle:str, excludeChars:list = ["\n"], replaceChars:dict = {" ":"_","@": '', '"': "in", "'": "ft", "&":"AND", "#":"NUM"}):
     for chars in excludeChars:
         dwgTitle = dwgTitle.replace(chars, '')
     for chars in replaceChars.keys():
         dwgTitle = dwgTitle.replace(chars, replaceChars[chars])
-    #convery fractions to decimals
+    #handle "/" characters
     while "/" in dwgTitle:
         index = dwgTitle.index("/")
-        #get numerator:
-        numeratorIndex = index - 1
-        for i in reversed(range(0,index)):
-            if(not dwgTitle[i].isdigit()):
-                break
-            numeratorIndex = i
-        #get denominator
-        denominatorIndex = index + 1
-        for i in range(index + 1, len(dwgTitle)):
-            if(not dwgTitle[i].isdigit()):
-                break
-            denominatorIndex = i
-        numVal = round(int(dwgTitle[numeratorIndex:index])/int(dwgTitle[(index + 1):(denominatorIndex + 1)]),4)
-        dwgTitle = dwgTitle[:numeratorIndex] + str(numVal) + dwgTitle[denominatorIndex + 1:]
+        try:
+            #is fraction
+            if(dwgTitle[index - 1].isdigit() and dwgTitle[index + 1].isdigit()):
+                #get numerator:
+                numeratorIndex = index - 1
+                for i in reversed(range(0,index)):
+                    if(not dwgTitle[i].isdigit()):
+                        break
+                    numeratorIndex = i
+                #get denominator
+                denominatorIndex = index + 1
+                for i in range(index + 1, len(dwgTitle)):
+                    if(not dwgTitle[i].isdigit()):
+                        break
+                    denominatorIndex = i
+                numVal = round(int(dwgTitle[numeratorIndex:index])/int(dwgTitle[(index + 1):(denominatorIndex + 1)]),4)
+                dwgTitle = dwgTitle[:numeratorIndex] + str(numVal) + dwgTitle[denominatorIndex + 1:]
+            #is "W/" ("with" abreviaton)
+            elif(dwgTitle[index - 1].upper() == "W") and not dwgTitle[index - 2].isalnum():
+                dwgTitle = dwgTitle[:index - 1] + "WITH" + dwgTitle[index + 1:]
+            #is "C/W" ("comes with" abreviation)
+            elif (dwgTitle[index - 1:index + 2].upper() == "C/W") and not dwgTitle[index - 2].isalnum() and not dwgTitle[index + 2].isalnum():
+                dwgTitle = dwgTitle[:index - 1] + "WITH" + dwgTitle[index + 2:]
+            else: #replace "/" with "-" 
+                dwgTitle = dwgTitle[:index] + "-" + dwgTitle[index + 1:]
+        except Exception as e:
+            #replace "/" with "-" 
+            dwgTitle = dwgTitle[:index] + "-" + dwgTitle[index + 1:]
     return dwgTitle
 
 def find_dwg_num_box_contour(boxContours: list, Y_TOLERANCE: int = 45):
@@ -157,7 +171,7 @@ def find_dwg_num_and_title(
     ###### find drawing number ######
 
     # find contours for dwg num field
-    numBoxContours = find_dwg_num_box_contour(dataBoxContours)
+    numBoxContours = find_dwg_num_box_contour(dataBoxContours, Y_TOLERANCE=Y_TOLERANCE)
     if numBoxContours is None:  # null check
         raise Exception("Drawing Number field not found")
 
@@ -181,7 +195,7 @@ def find_dwg_num_and_title(
     ###### find drawing title ######
 
     # find contours for dwg title field
-    titleBoxContours = find_dwg_title_box_contour(dataBoxContours)
+    titleBoxContours = find_dwg_title_box_contour(dataBoxContours,X_TOLERANCE=X_TOLERANCE)
     if titleBoxContours is None:  # null check
         raise Exception("Drawing Title field not found")
 
@@ -205,7 +219,7 @@ def find_dwg_num_and_title(
         dialation, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE
     )
 
- # find contours for title text inside dwg title box
+    # find contours for title text inside dwg title box
     titleTextContours = []
     otherContours = []
     for i in range(len(titleContoursList)):
@@ -255,7 +269,7 @@ def find_dwg_num_and_title(
         x, y, w, h = cv2.boundingRect(c)
         textImg = titleImg[y : y + h, x : x + w]
         text = pytesseract.image_to_string(textImg, config="--psm 6")
-        if text == "" or text == "\n":
+        if text == "" or text == "\n" or text == " ":
             continue
         titleComp.append(text)
     if len(titleComp) < 1:
