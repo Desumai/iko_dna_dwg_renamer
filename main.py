@@ -5,6 +5,7 @@ from pdf_stuff import pdf_to_np_array_list
 from OCR import find_dwg_num_and_title
 import os, consts
 from pytesseract import pytesseract
+import time
 
 
 
@@ -32,6 +33,7 @@ if not os.path.exists(successPath):
 if not os.path.exists(failPath):
     os.makedirs(failPath)
 
+start = time.time()
 print("Parsing input PDF...")
 pdfImages = pdf_to_np_array_list(inputPath)
 
@@ -80,5 +82,5 @@ for filename in os.listdir(consts.TEMP_PATH):
     except Exception as e:
         print('Failed to delete %s. Reason: %s' % (file_path, e))
 """
-print('done')
+print(f"Done. Took {time.time() - start} seconds.")
 input("Press ENTER to continue...")

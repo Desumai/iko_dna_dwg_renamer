@@ -189,11 +189,6 @@ def find_dwg_num_and_title(
     titleX, titleY, titleW, titleH = cv2.boundingRect(titleBoxContours)
     titleImg = image[titleY : titleY + titleH, titleX : titleX + titleW]
 
-    # ensure image is dwg title field
-    titleAllText = pytesseract.image_to_string(titleImg, config="--psm 11")
-    if "TITLE" not in titleAllText.upper():
-        raise Exception("Wrong field found. Not a drawing title")
-
     # find text contours in dwg title field
 
     # Convert the image to gray scale
@@ -210,31 +205,53 @@ def find_dwg_num_and_title(
         dialation, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE
     )
 
-    # find contours for title text inside dwg title box
-    textContours = []
+ # find contours for title text inside dwg title box
+    titleTextContours = []
+    otherContours = []
     for i in range(len(titleContoursList)):
         x, y, w, h = cv2.boundingRect(titleContoursList[i])
         A = w * h
         if (
-            A >= MIN_TEXT_AREA
-            and x >= round(w * MIN_PERCENT_INDENT)
-            and w >= MIN_TEXT_WIDTH
-            and h >= MIN_TEXT_HEIGHT
+            A < MIN_TEXT_AREA
+            or x < round(w * MIN_PERCENT_INDENT)
+            or w < MIN_TEXT_WIDTH
+            or h < MIN_TEXT_HEIGHT
         ):
-            textContours.append(
+            otherContours.append(
                 np.array([[x, y], [x + w, y], [x + w, y + h], [x, y + h]])
                 .reshape((-1, 1, 2))
                 .astype(np.int32)
             )
-    if len(textContours) < 1:
+        else:
+            titleTextContours.append(
+                np.array([[x, y], [x + w, y], [x + w, y + h], [x, y + h]])
+                .reshape((-1, 1, 2))
+                .astype(np.int32)
+            )
+    if len(titleTextContours) < 1:
         raise Exception("No drawing title found")
+    
+    #ensure field found is title box i.e. contains the text "TITLE"
+    isTitleBox = False
+    for c in otherContours:
+        x, y, w, h = cv2.boundingRect(c)
+        if w < 30 or h < 10 or w * h < 300:
+            continue
+        tempImg = titleImg[y : y + h , x : x + w]
+        text:str = pytesseract.image_to_string(tempImg, config="--psm 6")
+        if("TITLE" in text.upper()):
+            isTitleBox = True
+            break
+    if(not isTitleBox):
+        raise Exception("Wrong field found. Not a drawing title")
+    
     # read and save title text
-    textContours.sort(  # sort text by left to right, top down
+    titleTextContours.sort(  # sort text by left to right, top down
         key=lambda c: cv2.boundingRect(c)[1] * 1000000 + cv2.boundingRect(c)[0],
         reverse=False,
     )
     titleComp = []
-    for c in textContours:
+    for c in titleTextContours:
         x, y, w, h = cv2.boundingRect(c)
         textImg = titleImg[y : y + h, x : x + w]
         text = pytesseract.image_to_string(textImg, config="--psm 6")
