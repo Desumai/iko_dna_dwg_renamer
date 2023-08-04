@@ -1,12 +1,13 @@
 Creator: siudust
 Date: August 4, 2023
-Version 0.2.1
+Version 0.3.0
 
 
 Program Info:
 Extracts and renames individual asset/item drawings from a DNA PDF drawing package.
-Reads drawing number and title using Tesseract OCR and OpenCV.
-Names drawings according to their drawing number and title (i.e. "{title}-{number}.pdf").
+Reads drawing number and sheet number information using Tesseract OCR and OpenCV.
+Names drawings according to their drawing number  (i.e. {drawing number}.pdf").
+Drawings with multiple sheets are save into a single PDF file.
 Successfully and unsuccessfully renamed items will be saved in the "completed" and "failed" folders, respectfully (in the selected output directory).
 
 To Run:
