@@ -49,10 +49,10 @@ with fitz.open(inputPath) as file:
         try:
             find_dwg_and_sheet_num(image,result)
             print(end=consts.LINE_CLEAR)
-            print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): {result[0]}")
+            print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): {result[0]:<60}")
         except Exception as e:
             print(end=consts.LINE_CLEAR)
-            print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): [ERROR] {e}")
+            print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): [ERROR] {e:<60}")
         
         newPage = DwgPage(pageNum = i, dwgNum = result[0], currentSheet = result[1][0], totalSheet = result[1][1])
         if(newPage.is_valid()):
@@ -76,7 +76,7 @@ with fitz.open(inputPath) as file:
                     continue
             except Exception as e:
                 print(end=consts.LINE_CLEAR)
-                print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): [ERROR] {e}")
+                print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): [ERROR] {e:<60}")
         pageCache.append(newPage)
         for page in pageCache:      
             savePath = failPath + "\\drawing" + "{:03d}".format(page.pageNum) + ".pdf"
