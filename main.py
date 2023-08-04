@@ -1,11 +1,10 @@
 
 from file_management import get_PDF_path, get_save_path
-from PyPDF2 import PdfReader,PdfWriter
-from pdf_stuff import pdf_to_np_array_list
-from OCR import opencv_find_dwg_num, opencv_find_dwg_title
-import os, consts
+from pdf_stuff import pdf_page_to_np_array, save_page_as_pdf
+from OCR import find_dwg_num_and_title
+import os, consts, fitz
 from pytesseract import pytesseract
-
+import time
 
 
 
@@ -32,56 +31,38 @@ if not os.path.exists(successPath):
 if not os.path.exists(failPath):
     os.makedirs(failPath)
 
-print("Converting pdf to images...")
-pdfImages = pdf_to_np_array_list(inputPath)
-
-print(f"{len(pdfImages)} drawings found.")
-
-print("Reading drawings...")
-
-with open(inputPath, "rb") as file:
-    inputPdf = PdfReader(file)
-
-    for i, image in enumerate(pdfImages):
-        dwgName = None
-        dwgTitle = None
+print("Processing Drawings...")
+start = time.time()
+with fitz.open(inputPath) as file:
+    numOfPages = len(file)
+    for i, page in enumerate(file):
+        #process page into image numpy array for OCR
+        image = pdf_page_to_np_array(page)
+        #read drawing info
+        result = [None,None] #dwg num, dwg title
         try:
-            dwgName = opencv_find_dwg_num(image)
-            dwgTitle = opencv_find_dwg_title(image)
-            print(f"{i}: {dwgName}")
+            find_dwg_num_and_title(image,result)
+            print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): {result[0]}")
         except Exception as e:
-            print(f"{i}: {e}")
-        output = PdfWriter()
-        output.add_page(inputPdf.pages[i])
-        if(dwgName is not None and dwgTitle is not None):
+            print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): [ERROR] {e}")
+        
+        if(result[0] is not None and result[1] is not None):
             try:
-                with open(successPath + "\\" + dwgTitle + '-' + dwgName + ".pdf", "wb") as outputStream:
-                    output.write(outputStream)
+                savePath = successPath + "\\" + result[1] + '-' + result[0] + ".pdf"
+                save_page_as_pdf(savePath,file,i)
                 continue
             except Exception as e:
-                print(f"{i}: [ERROR] {e}")
-        if (dwgName is not None):
+                print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): [ERROR] {e}")
+        if (result[0] is not None):
             try:
-                with open(failPath + "\\" + dwgName + ".pdf", "wb") as outputStream:
-                    output.write(outputStream)
+                savePath = failPath + "\\" + result[0] + ".pdf"
+                save_page_as_pdf(savePath, file, i)
                 continue
             except Exception as e:
-                print(f"{i}: [ERROR] {e}")
-        with open(failPath + "\\drawing" + "{:03d}".format(i) + ".pdf", "wb") as outputStream:
-            output.write(outputStream)
-        continue
-"""
+                print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): [ERROR] {e}")
+        savePath = failPath + "\\drawing" + "{:03d}".format(i) + ".pdf"
+        save_page_as_pdf(savePath, file, i)
+    pass
 
-print("Deleting temp files...")
-for filename in os.listdir(consts.TEMP_PATH):
-    file_path = os.path.join(consts.TEMP_PATH, filename)
-    try:
-        if os.path.isfile(file_path) or os.path.islink(file_path):
-            os.unlink(file_path)
-        elif os.path.isdir(file_path):
-            shutil.rmtree(file_path)
-    except Exception as e:
-        print('Failed to delete %s. Reason: %s' % (file_path, e))
-"""
-print('done')
+print(f"Done. Took {time.time() - start} seconds.")
 input("Press ENTER to continue...")
