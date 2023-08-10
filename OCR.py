@@ -12,18 +12,18 @@ def reformat_dwg_num(dwgNum:str, excludeChars:list = [" ", "\n",".iam",".ipt","~
     return dwgNum
 
 def reformat_sheet_num(sheetNum:str) -> tuple:
-    sheetNum = sheetNum.upper().replace(" ","")
+    parsedStr = sheetNum.upper().replace(" ","").replace('\t',"")
     try:
-        if "OF" not in sheetNum:
+        if "OF" not in parsedStr:
             raise Exception()
-        numList = sheetNum.split("OF")
+        numList = parsedStr.split("OF")
         first = int(numList[0])
         second = int(numList[1])
         if(first > second) or first < 1 or second < 1:
             raise Exception()
         return (first, second)
     except Exception as e:
-        raise Exception(f"Wrong Sheet Number format: '{sheetNum}'")
+        raise Exception("Wrong Sheet Number format: '" + sheetNum.replace('\n','\\n') + "'")
 
         
 
@@ -64,7 +64,7 @@ def find_sheet_num_and_dwg_num_box_contour(boxContours: list, Y_TOLERANCE: int =
 
 def find_dwg_and_sheet_num(
     image: np.ndarray,
-    output: list = [None, None],  # [dwg num, dwg title]
+    output: list = [None, [None, None]],  # [dwg num, [sheet num, total sheets]]
     MIN_BOX_AREA: int = 3000,
     MIN_BOX_HEIGHT: int = 40,
     MAX_BOX_AREA_RATIO: float = 0.3464,
@@ -156,18 +156,19 @@ def find_dwg_and_sheet_num(
     #make sure sheet num field is found
     if sheetNumBoxContour is None: #null check
         raise Exception("Sheet Number field not found")
-    dwgX, dwgY, dwgW, dwgH = cv2.boundingRect(sheetNumBoxContour)
+    sheetX, sheetY, sheetW, sheetH = cv2.boundingRect(sheetNumBoxContour)
+
     # check if correct field was found
     headerText = pytesseract.image_to_string(
         image=image[
-            dwgY : dwgY + round(DATA_BOX_HEADER_VERTICAL_SPLIT * dwgH),
-            dwgX : dwgX + dwgW,
-        ],
+            sheetY : sheetY + round(DATA_BOX_HEADER_VERTICAL_SPLIT * sheetH),
+            sheetX : sheetX + sheetW,
+        ], config="--psm 6"
     )
     if "SHEET" not in headerText.upper():
         raise Exception(f"Wrong field found. Not sheet number information  ('{headerText}' field found instead)")
 
     # read and save drawing number
-    cropped = image[round(dwgY + DATA_BOX_HEADER_VERTICAL_SPLIT * dwgH) : dwgY + dwgH, dwgX : dwgX + dwgW]
+    cropped = image[round(sheetY + DATA_BOX_HEADER_VERTICAL_SPLIT * sheetH) : sheetY + sheetH, sheetX : sheetX + sheetW]
     text = pytesseract.image_to_string(cropped, config="--psm 6")
     output[1] = reformat_sheet_num(text)

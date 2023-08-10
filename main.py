@@ -45,14 +45,12 @@ with fitz.open(inputPath) as file:
         printProgressBar(i,numOfPages,prefix="Progress: ",suffix= f"({f'{i}/{numOfPages})':<10}", length= 50)
         image = pdf_page_to_np_array(page)
         #read drawing info
-        result = [None,None] #[dwg num, (current sheet num, total sheet num)]
+        result = [None,[None, None]] #[dwg num, [current sheet num, total sheet num]]
         try:
             find_dwg_and_sheet_num(image,result)
-            print(end=consts.LINE_CLEAR)
-            print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): {result[0]:<60}")
+            print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): {result[0]:<80}")
         except Exception as e:
-            print(end=consts.LINE_CLEAR)
-            print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): [ERROR] {e:<60}")
+            print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): [ERROR] {str(e):<90}")
         
         newPage = DwgPage(pageNum = i, dwgNum = result[0], currentSheet = result[1][0], totalSheet = result[1][1])
         if(newPage.is_valid()):
@@ -75,8 +73,7 @@ with fitz.open(inputPath) as file:
                     pageCache = []
                     continue
             except Exception as e:
-                print(end=consts.LINE_CLEAR)
-                print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): [ERROR] {e:<60}")
+                print("{:>4}".format(f"({i + 1}") +  f"/{numOfPages}): [ERROR] {str(e):<90}")
         pageCache.append(newPage)
         for page in pageCache:      
             savePath = failPath + "\\drawing" + "{:03d}".format(page.pageNum) + ".pdf"
