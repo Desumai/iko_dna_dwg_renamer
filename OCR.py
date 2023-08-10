@@ -5,6 +5,13 @@ import pytesseract
 from PIL import Image
 
 def reformat_dwg_num(dwgNum:str, excludeChars:list = [" ", "\n",".iam",".ipt","~"]) -> str:
+    '''
+    Reformats OCR-output text into proper drawing number format
+    Returns the supposed drawing number
+    @params
+        - dwgNum: the output string from tesseract (str)
+        - excludeChars: list of characters (or string of characters) to exclude from the output (list<str>)
+    '''
     for chars in excludeChars:
         dwgNum = dwgNum.replace(chars, '')
     if(dwgNum[len(dwgNum) - 1] == "."):
@@ -12,7 +19,17 @@ def reformat_dwg_num(dwgNum:str, excludeChars:list = [" ", "\n",".iam",".ipt","~
     return dwgNum
 
 def reformat_sheet_num(sheetNum:str) -> tuple:
-    parsedStr = sheetNum.upper().replace(" ","").replace('\t',"")
+    '''
+    Reformats OCR-output text into proper sheet number formats
+    Returns a tuple (sheet number, total number of sheets)
+
+    @params:
+        - sheetNum: the output string from tesseract (str) 
+    '''
+    parsedStr = sheetNum.upper().replace(" ","").replace('\t',"").replace('\n', '')
+
+    #replacements for OCR mistakes
+    parsedStr = parsedStr.replace("OR", "OF").replace("L", "1")   
     try:
         if "OF" not in parsedStr:
             raise Exception()
@@ -83,15 +100,9 @@ def find_dwg_and_sheet_num(
         - MIN_BOX_AREA: the minimum size of a drawing data box (int)
         - MIN_BOX_HEIGHT: minimum height for a contour to be potentially a drawing data box (int)
         - MAX_BOX_AREA_RATIO: the maximum size of a drawing data box, relative to the drawing size (float)
-        - DRAWING_NUMBER_BOX_HEADER_HORIZONTAL_SPLIT: the height of the header text for the dwg # box, 
+        - DATA_BOX_HEADER_VERTICAL_SPLIT: the height of the header text for a data box (dwg # or sheet # box), 
             as a decimal percentage of the height of the dwg # box (from the top) (float)
-        - X_TOLERANCE: permissible x difference between two contours to be considered the same "column" (int)
         - Y_TOLERANCE: permissible y difference between two contours to be considered the same "row" (int)
-        - MIN_TEXT_HEIGHT: minimum height for a contour to be potentially text (int)
-        - MIN_TEXT_WIDTH: minimum width for a contour to be potentially text (int)
-        - MIN_TEXT_AREA: minimum area for a contour to be potentially text (int)
-        - MIN_PERCENT_INDENT: for dwg title box only. Minimum indent from the left edge if the box that a contour must have to
-            potentially be dwg title text. A decimal percentage of the width of the dwg title box (float)
     """
     # get image dimensions
     imgHeight = image.shape[0]
